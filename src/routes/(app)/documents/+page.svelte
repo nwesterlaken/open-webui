@@ -11,12 +11,9 @@
 	import { uploadDocToVectorDB } from '$lib/apis/rag';
 	import { transformFileName } from '$lib/utils';
 
-	import Checkbox from '$lib/components/common/Checkbox.svelte';
-
 	import EditDocModal from '$lib/components/documents/EditDocModal.svelte';
 	import AddFilesPlaceholder from '$lib/components/AddFilesPlaceholder.svelte';
 	import SettingsModal from '$lib/components/documents/SettingsModal.svelte';
-	import AddDocModal from '$lib/components/documents/AddDocModal.svelte';
 	let importFiles = '';
 
 	let inputFiles = '';
@@ -25,7 +22,6 @@
 	let tags = [];
 
 	let showSettingsModal = false;
-	let showAddDocModal = false;
 	let showEditDocModal = false;
 	let selectedDoc;
 	let selectedTag = '';
@@ -34,16 +30,6 @@
 
 	const deleteDoc = async (name) => {
 		await deleteDocByName(localStorage.token, name);
-		await documents.set(await getDocs(localStorage.token));
-	};
-
-	const deleteDocs = async (docs) => {
-		const res = await Promise.all(
-			docs.map(async (doc) => {
-				return await deleteDocByName(localStorage.token, doc.name);
-			})
-		);
-
 		await documents.set(await getDocs(localStorage.token));
 	};
 
@@ -137,15 +123,6 @@
 			dropZone?.removeEventListener('dragleave', onDragLeave);
 		};
 	});
-
-	let filteredDocs;
-
-	$: filteredDocs = $documents.filter(
-		(doc) =>
-			(selectedTag === '' ||
-				(doc?.content?.tags ?? []).map((tag) => tag.name).includes(selectedTag)) &&
-			(query === '' || doc.name.includes(query))
-	);
 </script>
 
 {#if dragged}
@@ -173,7 +150,36 @@
 	<EditDocModal bind:show={showEditDocModal} {selectedDoc} />
 {/key}
 
-<AddDocModal bind:show={showAddDocModal} />
+<input
+	id="upload-doc-input"
+	bind:files={inputFiles}
+	type="file"
+	multiple
+	hidden
+	on:change={async (e) => {
+		if (inputFiles && inputFiles.length > 0) {
+			for (const file of inputFiles) {
+				console.log(file, file.name.split('.').at(-1));
+				if (
+					SUPPORTED_FILE_TYPE.includes(file['type']) ||
+					SUPPORTED_FILE_EXTENSIONS.includes(file.name.split('.').at(-1))
+				) {
+					uploadDoc(file);
+				} else {
+					toast.error(
+						`Unknown File Type '${file['type']}', but accepting and treating as plain text`
+					);
+					uploadDoc(file);
+				}
+			}
+
+			inputFiles = null;
+			e.target.value = '';
+		} else {
+			toast.error(`File not found.`);
+		}
+	}}
+/>
 
 <SettingsModal bind:show={showSettingsModal} />
 
@@ -241,7 +247,7 @@
 					<button
 						class=" px-2 py-2 rounded-xl border border-gray-200 dark:border-gray-600 dark:border-0 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 transition font-medium text-sm flex items-center space-x-1"
 						on:click={() => {
-							showAddDocModal = true;
+							document.getElementById('upload-doc-input')?.click();
 						}}
 					>
 						<svg
@@ -280,97 +286,39 @@
 			<hr class=" dark:border-gray-700 my-2.5" />
 
 			{#if tags.length > 0}
-				<div class="px-2.5 pt-1 flex gap-1 flex-wrap">
-					<div class="ml-0.5 pr-3 my-auto flex items-center">
-						<Checkbox
-							state={filteredDocs.filter((doc) => doc?.selected === 'checked').length ===
-							filteredDocs.length
-								? 'checked'
-								: 'unchecked'}
-							indeterminate={filteredDocs.filter((doc) => doc?.selected === 'checked').length > 0 &&
-								filteredDocs.filter((doc) => doc?.selected === 'checked').length !==
-									filteredDocs.length}
-							on:change={(e) => {
-								if (e.detail === 'checked') {
-									filteredDocs = filteredDocs.map((doc) => ({ ...doc, selected: 'checked' }));
-								} else if (e.detail === 'unchecked') {
-									filteredDocs = filteredDocs.map((doc) => ({ ...doc, selected: 'unchecked' }));
-								}
-							}}
-						/>
-					</div>
-
-					{#if filteredDocs.filter((doc) => doc?.selected === 'checked').length === 0}
+				<div class="px-2.5 mt-0.5 mb-2 flex gap-1 flex-wrap">
+					<button
+						class="px-2 py-0.5 space-x-1 flex h-fit items-center rounded-full transition border dark:border-gray-600 dark:text-white"
+						on:click={async () => {
+							selectedTag = '';
+							// await chats.set(await getChatListByTagName(localStorage.token, tag.name));
+						}}
+					>
+						<div class=" text-xs font-medium self-center line-clamp-1">all</div>
+					</button>
+					{#each tags as tag}
 						<button
-							class="px-2 py-0.5 space-x-1 flex h-fit items-center rounded-full transition bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:text-white"
+							class="px-2 py-0.5 space-x-1 flex h-fit items-center rounded-full transition border dark:border-gray-600 dark:text-white"
 							on:click={async () => {
-								selectedTag = '';
+								selectedTag = tag;
 								// await chats.set(await getChatListByTagName(localStorage.token, tag.name));
 							}}
 						>
-							<div class=" text-xs font-medium self-center line-clamp-1">all</div>
+							<div class=" text-xs font-medium self-center line-clamp-1">
+								#{tag}
+							</div>
 						</button>
-
-						{#each tags as tag}
-							<button
-								class="px-2 py-0.5 space-x-1 flex h-fit items-center rounded-full transition bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:text-white"
-								on:click={async () => {
-									selectedTag = tag;
-									// await chats.set(await getChatListByTagName(localStorage.token, tag.name));
-								}}
-							>
-								<div class=" text-xs font-medium self-center line-clamp-1">
-									#{tag}
-								</div>
-							</button>
-						{/each}
-					{:else}
-						<div class="flex-1 flex w-full justify-between items-center">
-							<div class="text-xs font-medium py-0.5 self-center mr-1">
-								{filteredDocs.filter((doc) => doc?.selected === 'checked').length} Selected
-							</div>
-
-							<div class="flex gap-1">
-								<!-- <button
-									class="px-2 py-0.5 space-x-1 flex h-fit items-center rounded-full transition bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:text-white"
-									on:click={async () => {
-										selectedTag = '';
-										// await chats.set(await getChatListByTagName(localStorage.token, tag.name));
-									}}
-								>
-									<div class=" text-xs font-medium self-center line-clamp-1">add tags</div>
-								</button> -->
-
-								<button
-									class="px-2 py-0.5 space-x-1 flex h-fit items-center rounded-full transition bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:text-white"
-									on:click={async () => {
-										deleteDocs(filteredDocs.filter((doc) => doc.selected === 'checked'));
-										// await chats.set(await getChatListByTagName(localStorage.token, tag.name));
-									}}
-								>
-									<div class=" text-xs font-medium self-center line-clamp-1">delete</div>
-								</button>
-							</div>
-						</div>
-					{/if}
+					{/each}
 				</div>
 			{/if}
 
 			<div class="my-3 mb-5">
-				{#each filteredDocs as doc}
-					<button
-						class=" flex space-x-4 cursor-pointer text-left w-full px-3 py-2 dark:hover:bg-white/5 hover:bg-black/5 rounded-xl"
-						on:click={() => {
-							if (doc?.selected === 'checked') {
-								doc.selected = 'unchecked';
-							} else {
-								doc.selected = 'checked';
-							}
-						}}
+				{#each $documents.filter((doc) => (selectedTag === '' || (doc?.content?.tags ?? [])
+								.map((tag) => tag.name)
+								.includes(selectedTag)) && (query === '' || doc.name.includes(query))) as doc}
+					<div
+						class=" flex space-x-4 cursor-pointer w-full px-3 py-2 dark:hover:bg-white/5 hover:bg-black/5 rounded-xl"
 					>
-						<div class="my-auto flex items-center">
-							<Checkbox state={doc?.selected ?? 'unchecked'} />
-						</div>
 						<div class=" flex flex-1 space-x-4 cursor-pointer w-full">
 							<div class=" flex items-center space-x-3">
 								<div class="p-2.5 bg-red-400 text-white rounded-lg">
@@ -429,7 +377,7 @@
 										>
 									{/if}
 								</div>
-								<div class=" self-center flex-1">
+								<div class=" flex-1 self-center flex-1">
 									<div class=" font-bold line-clamp-1">#{doc.name} ({doc.filename})</div>
 									<div class=" text-xs overflow-hidden text-ellipsis line-clamp-1">
 										{doc.title}
@@ -439,10 +387,9 @@
 						</div>
 						<div class="flex flex-row space-x-1 self-center">
 							<button
-								class="self-center w-fit text-sm z-20 px-2 py-2 dark:text-gray-300 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-xl"
+								class="self-center w-fit text-sm px-2 py-2 dark:text-gray-300 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-xl"
 								type="button"
-								on:click={async (e) => {
-									e.stopPropagation();
+								on:click={async () => {
 									showEditDocModal = !showEditDocModal;
 									selectedDoc = doc;
 								}}
@@ -488,9 +435,7 @@
 							<button
 								class="self-center w-fit text-sm px-2 py-2 dark:text-gray-300 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-xl"
 								type="button"
-								on:click={(e) => {
-									e.stopPropagation();
-
+								on:click={() => {
 									deleteDoc(doc.name);
 								}}
 							>
@@ -510,7 +455,7 @@
 								</svg>
 							</button>
 						</div>
-					</button>
+					</div>
 				{/each}
 			</div>
 

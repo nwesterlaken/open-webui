@@ -4,13 +4,14 @@
 	const { saveAs } = fileSaver;
 
 	import { getChatById } from '$lib/apis/chats';
-	import { WEBUI_NAME, chatId, modelfiles, settings } from '$lib/stores';
+	import { chatId, modelfiles, settings } from '$lib/stores';
 	import ShareChatModal from '../chat/ShareChatModal.svelte';
 	import TagInput from '../common/Tags/TagInput.svelte';
 	import Tags from '../common/Tags.svelte';
+	import { WEBUI_NAME } from '$lib/constants';
 
 	export let initNewChat: Function;
-	export let title: string = $WEBUI_NAME;
+	export let title: string = WEBUI_NAME;
 	export let shareEnabled: boolean = false;
 
 	export let tags = [];
@@ -101,7 +102,7 @@
 			</div>
 			<div class=" flex-1 self-center font-medium line-clamp-1">
 				<div>
-					{title != '' ? title : $WEBUI_NAME}
+					{title != '' ? title : WEBUI_NAME}
 				</div>
 			</div>
 

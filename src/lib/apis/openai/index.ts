@@ -150,6 +150,7 @@ export const getOpenAIModels = async (token: string = '') => {
 			return res.json();
 		})
 		.catch((err) => {
+			console.log(err);
 			error = `OpenAI: ${err?.error?.message ?? 'Network Problem'}`;
 			return [];
 		});
@@ -162,7 +163,7 @@ export const getOpenAIModels = async (token: string = '') => {
 
 	return models
 		? models
-				.map((model) => ({ id: model.id, name: model.name ?? model.id, external: true }))
+				.map((model) => ({ name: model.id, external: true }))
 				.sort((a, b) => {
 					return a.name.localeCompare(b.name);
 				})
@@ -199,21 +200,17 @@ export const getOpenAIModelsDirect = async (
 	const models = Array.isArray(res) ? res : res?.data ?? null;
 
 	return models
-		.map((model) => ({ id: model.id, name: model.name ?? model.id, external: true }))
+		.map((model) => ({ name: model.id, external: true }))
 		.filter((model) => (base_url.includes('openai') ? model.name.includes('gpt') : true))
 		.sort((a, b) => {
 			return a.name.localeCompare(b.name);
 		});
 };
 
-export const generateOpenAIChatCompletion = async (
-	token: string = '',
-	body: object,
-	url: string = OPENAI_API_BASE_URL
-) => {
+export const generateOpenAIChatCompletion = async (token: string = '', body: object) => {
 	let error = null;
 
-	const res = await fetch(`${url}/chat/completions`, {
+	const res = await fetch(`${OPENAI_API_BASE_URL}/chat/completions`, {
 		method: 'POST',
 		headers: {
 			Authorization: `Bearer ${token}`,
